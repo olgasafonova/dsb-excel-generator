@@ -57,8 +57,8 @@ func main() {
 	// Track used CPR numbers to ensure uniqueness
 	usedCPRs := make(map[string]bool)
 
-	// Generate 2000 rows of data
-	for row := 2; row <= 2001; row++ {
+	// Generate 3000 rows of data
+	for row := 2; row <= 3001; row++ {
 		// Generate unique CPR number (DDMMYY-XXXX)
 		var cpr string
 		for {
@@ -137,7 +137,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("\nSuccessfully generated %s with 2000 rows of data!\n", filename)
+	fmt.Printf("\nSuccessfully generated %s with 3000 rows of data!\n", filename)
 }
 
 // generateCPR generates a fake Danish CPR number in format DDMMYY-XXXX

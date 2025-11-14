@@ -5,7 +5,7 @@ This Go program generates mock employee data in Excel format and creates individ
 ## Features
 
 ### Excel Generator (`main.go`)
-- Generates 2,000 rows of realistic Danish employee data
+- Generates 3,000 rows of realistic Danish employee data
 - Includes columns: CPR, FirstName, LastName, salary information, adjustments, and dates
 - All CPR numbers are guaranteed unique
 - Realistic Danish names and salary ranges (25,000-75,000 kr/month)
@@ -25,8 +25,8 @@ This Go program generates mock employee data in Excel format and creates individ
 ## Size Estimates
 
 - **Single PDF:** ~2.1 KB
-- **2,000 PDFs:** ~4.2 MB total
-- **Excel file:** ~152 KB
+- **3,000 PDFs:** ~6.3 MB total
+- **Excel file:** ~225 KB
 
 ## Usage
 
@@ -36,7 +36,7 @@ This Go program generates mock employee data in Excel format and creates individ
 go run main.go
 ```
 
-This creates `dsb-mock-data-excel.xlsx` with 2,000 employee records.
+This creates `dsb-mock-data-excel.xlsx` with 3,000 employee records.
 
 ### 2. Generate PDFs
 
@@ -45,11 +45,11 @@ This creates `dsb-mock-data-excel.xlsx` with 2,000 employee records.
 go run pdf_generator.go
 ```
 
-**Generate all 2,000 PDFs:**
+**Generate all 3,000 PDFs:**
 
 Edit `pdf_generator.go` line 223 to change the limit:
 ```go
-generatePDFs("dsb-mock-data-excel.xlsx", "output_pdfs", 2000)
+generatePDFs("dsb-mock-data-excel.xlsx", "output_pdfs", 3000)
 ```
 
 Then run:
