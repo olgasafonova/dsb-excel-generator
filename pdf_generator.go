@@ -102,15 +102,18 @@ func generatePDFs(excelFile string, outputDir string, limit int) error {
 }
 
 func createWCAGCompliantPDF(emp EmployeeData, outputPath string) error {
-	// Create new PDF with A4 page size and UTF-8 encoding
+	// Create new PDF with A4 page size
 	pdf := gofpdf.New("P", "mm", "A4", "")
 
+	// Enable UTF-8 support for Danish characters (æ, ø, å)
+	tr := pdf.UnicodeTranslatorFromDescriptor("cp1252")
+
 	// Set document metadata for accessibility
-	pdf.SetTitle(fmt.Sprintf("Lønregulering 2025 – %s %s", emp.FirstName, emp.LastName), false)
+	pdf.SetTitle(tr("Lønregulering 2025 – "+emp.FirstName+" "+emp.LastName), false)
 	pdf.SetAuthor("HR Services & Compensation", false)
-	pdf.SetSubject("Lønregulering 2025", false)
+	pdf.SetSubject(tr("Lønregulering 2025"), false)
 	pdf.SetCreator("DSB Salary Regulation System", false)
-	pdf.SetKeywords("lønregulering salary 2025", false)
+	pdf.SetKeywords(tr("lønregulering salary 2025"), false)
 
 	pdf.AddPage()
 
@@ -126,80 +129,80 @@ func createWCAGCompliantPDF(emp EmployeeData, outputPath string) error {
 	// Document Title (H1 equivalent)
 	pdf.SetFont("Helvetica", "B", 18)
 	textColor()
-	pdf.CellFormat(0, 15, "Lønregulering 2025", "", 1, "C", false, 0, "")
+	pdf.CellFormat(0, 15, tr("Lønregulering 2025"), "", 1, "C", false, 0, "")
 	pdf.Ln(5)
 
 	// Greeting
 	pdf.SetFont("Helvetica", "", 12)
 	textColor()
 	greeting := fmt.Sprintf("Kære %s %s", emp.FirstName, emp.LastName)
-	pdf.MultiCell(0, 7, greeting, "", "L", false)
+	pdf.MultiCell(0, 7, tr(greeting), "", "L", false)
 	pdf.Ln(3)
 
 	// Introduction
 	intro := "Lønreguleringen 2025 for HK medarbejdere er nu afsluttet, og i dette brev kan du læse om hvad det betyder for dig."
-	pdf.MultiCell(0, 7, intro, "", "L", false)
+	pdf.MultiCell(0, 7, tr(intro), "", "L", false)
 	pdf.Ln(5)
 
 	// Section Heading (H2 equivalent)
 	pdf.SetFont("Helvetica", "B", 14)
 	textColor()
-	pdf.MultiCell(0, 7, "Regulering i henhold til overenskomst", "", "L", false)
+	pdf.MultiCell(0, 7, tr("Regulering i henhold til overenskomst"), "", "L", false)
 	pdf.Ln(2)
 
 	// Overenskomst text
 	pdf.SetFont("Helvetica", "", 12)
 	textColor()
 	overenskomstText := "Følgende regulering er fastlagt i overenskomsten med virkning 1. maj 2025:"
-	pdf.MultiCell(0, 7, overenskomstText, "", "L", false)
+	pdf.MultiCell(0, 7, tr(overenskomstText), "", "L", false)
 	pdf.Ln(2)
 
 	// Bullet point
 	bulletText := fmt.Sprintf("• Forhøjelse af pensionsbidrag med %s%%", emp.PensionIncrease)
 	pdf.SetX(pdf.GetX() + 10) // Indent bullet
-	pdf.MultiCell(0, 7, bulletText, "", "L", false)
+	pdf.MultiCell(0, 7, tr(bulletText), "", "L", false)
 	pdf.Ln(5)
 
 	// Individual adjustment heading (H2 equivalent)
 	pdf.SetFont("Helvetica", "B", 14)
 	textColor()
-	pdf.MultiCell(0, 7, "Individuel lønregulering", "", "L", false)
+	pdf.MultiCell(0, 7, tr("Individuel lønregulering"), "", "L", false)
 	pdf.Ln(2)
 
 	// Individual adjustment text
 	pdf.SetFont("Helvetica", "", 12)
 	textColor()
 	individualText := fmt.Sprintf("Din nærmeste leder har besluttet, at du ud over den nævnte stigning i overenskomsten også skal have en individuel lønregulering gældende pr. %s.", emp.EffectiveDate)
-	pdf.MultiCell(0, 7, individualText, "", "L", false)
+	pdf.MultiCell(0, 7, tr(individualText), "", "L", false)
 	pdf.Ln(5)
 
 	// Salary details with mixed formatting
 	pdf.SetFont("Helvetica", "", 12)
-	pdf.Write(7, "Din basisløn er blevet reguleret til ")
+	pdf.Write(7, tr("Din basisløn er blevet reguleret til "))
 	pdf.SetFont("Helvetica", "B", 12)
-	pdf.Write(7, fmt.Sprintf("%s kr.", emp.NewBaseSalary))
+	pdf.Write(7, tr(fmt.Sprintf("%s kr.", emp.NewBaseSalary)))
 	pdf.SetFont("Helvetica", "", 12)
-	pdf.Write(7, " og din nye bruttoløn udgør nu ")
+	pdf.Write(7, tr(" og din nye bruttoløn udgør nu "))
 	pdf.SetFont("Helvetica", "B", 12)
-	pdf.Write(7, fmt.Sprintf("%s kr.", emp.NewGrossSalary))
+	pdf.Write(7, tr(fmt.Sprintf("%s kr.", emp.NewGrossSalary)))
 	pdf.SetFont("Helvetica", "", 12)
-	pdf.Write(7, fmt.Sprintf(" Den individuelle lønregulering på din bruttoløn er %s kr., svarende til en stigning på %s%%.", emp.IndividualAdjustment, emp.PercentageIncrease))
+	pdf.Write(7, tr(fmt.Sprintf(" Den individuelle lønregulering på din bruttoløn er %s kr., svarende til en stigning på %s%%.", emp.IndividualAdjustment, emp.PercentageIncrease)))
 	pdf.Ln(10)
 
 	// Effective date
 	effectiveText := fmt.Sprintf("Din nye løn er med tilbagevirkende kraft fra den %s.", emp.EffectiveDate)
-	pdf.MultiCell(0, 7, effectiveText, "", "L", false)
+	pdf.MultiCell(0, 7, tr(effectiveText), "", "L", false)
 	pdf.Ln(3)
 
 	// Payment timing
 	paymentText := "Denne individuelle regulering vil finde sted ved lønudbetalingen ultimo juni måned 2025."
-	pdf.MultiCell(0, 7, paymentText, "", "L", false)
+	pdf.MultiCell(0, 7, tr(paymentText), "", "L", false)
 	pdf.Ln(10)
 
 	// Signature
 	pdf.SetFont("Helvetica", "", 12)
 	textColor()
-	pdf.MultiCell(0, 7, "Med venlig hilsen", "", "L", false)
+	pdf.MultiCell(0, 7, tr("Med venlig hilsen"), "", "L", false)
 	pdf.Ln(1)
 
 	pdf.SetFont("Helvetica", "B", 12)
