@@ -1,4 +1,4 @@
-package main
+package excel
 
 import (
 	"fmt"
@@ -52,7 +52,7 @@ var departments = []string{
 // Manager names (using the same name lists)
 func getRandomManagerName() string {
 	return danishFirstNames[rand.Intn(len(danishFirstNames))] + " " +
-		   danishLastNames[rand.Intn(len(danishLastNames))]
+		danishLastNames[rand.Intn(len(danishLastNames))]
 }
 
 // Document types for P360
@@ -65,7 +65,8 @@ var securityLevels = []string{
 	"Internal", "Confidential", "Strictly Confidential",
 }
 
-func main() {
+// Generate creates the Excel file with mock data
+func Generate(filename string) error {
 	rand.Seed(time.Now().UnixNano())
 
 	f := excelize.NewFile()
@@ -254,13 +255,12 @@ func main() {
 	}
 
 	// Save the file
-	filename := "dsb-mock-data-excel.xlsx"
 	if err := f.SaveAs(filename); err != nil {
-		fmt.Printf("Error saving file: %v\n", err)
-		return
+		return fmt.Errorf("error saving file: %v", err)
 	}
 
 	fmt.Printf("\nSuccessfully generated %s with 3000 rows of data!\n", filename)
+	return nil
 }
 
 // getExcelColumn converts column index to Excel column letter(s)
@@ -276,7 +276,7 @@ func getExcelColumn(index int) string {
 // generateCPR generates a fake Danish CPR number in format DDMMYY-XXXX
 func generateCPR() string {
 	// Generate a random date between 1960 and 2005
-	year := rand.Intn(46) + 60  // 60-105 (representing 1960-2005)
+	year := rand.Intn(46) + 60 // 60-105 (representing 1960-2005)
 	month := rand.Intn(12) + 1
 	day := rand.Intn(28) + 1 // Keep it simple, avoid month-specific day validation
 

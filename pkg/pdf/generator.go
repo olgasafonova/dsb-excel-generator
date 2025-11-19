@@ -1,29 +1,19 @@
-package main
+package pdf
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
-	"github.com/jung-kurt/gofpdf"
+	"dsb-excel-generator/pkg/models"
+
+	"github.com/go-pdf/fpdf"
 	"github.com/xuri/excelize/v2"
 )
 
-type EmployeeData struct {
-	CPR                  string
-	FirstName            string
-	LastName             string
-	BaseSalary           string
-	NewBaseSalary        string
-	GrossSalary          string
-	NewGrossSalary       string
-	IndividualAdjustment string
-	PercentageIncrease   string
-	EffectiveDate        string
-	PensionIncrease      string
-}
-
-func generatePDFs(excelFile string, outputDir string, limit int) error {
+// GeneratePDFs reads the Excel file and generates PDFs concurrently
+func GeneratePDFs(excelFile string, outputDir string, limit int) error {
 	// Create output directory
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
@@ -42,9 +32,28 @@ func generatePDFs(excelFile string, outputDir string, limit int) error {
 		return fmt.Errorf("failed to get rows: %v", err)
 	}
 
-	// Skip header row and process data rows
+	var wg sync.WaitGroup
+	numWorkers := 8 // Can be adjusted based on CPU cores
+	jobs := make(chan models.EmployeeData, 100)
+
+	// Start workers
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for emp := range jobs {
+				filename := fmt.Sprintf("Lønregulering 2025 – %s %s – %s.pdf",
+					emp.FirstName, emp.LastName, emp.CPR)
+				filePath := filepath.Join(outputDir, filename)
+				if err := createWCAGCompliantPDF(emp, filePath); err != nil {
+					fmt.Printf("Error generating PDF for %s: %v\n", filename, err)
+				}
+			}
+		}()
+	}
+
+	// Send jobs
 	count := 0
-	totalSize := int64(0)
 	for i, row := range rows {
 		if i == 0 {
 			continue // Skip header
@@ -55,11 +64,10 @@ func generatePDFs(excelFile string, outputDir string, limit int) error {
 		}
 
 		if len(row) < 11 {
-			fmt.Printf("Skipping row %d: insufficient data\n", i+1)
 			continue
 		}
 
-		employee := EmployeeData{
+		jobs <- models.EmployeeData{
 			CPR:                  row[0],
 			FirstName:            row[1],
 			LastName:             row[2],
@@ -72,38 +80,19 @@ func generatePDFs(excelFile string, outputDir string, limit int) error {
 			EffectiveDate:        row[9],
 			PensionIncrease:      row[10],
 		}
-
-		filename := fmt.Sprintf("Lønregulering 2025 – %s %s – %s.pdf",
-			employee.FirstName, employee.LastName, employee.CPR)
-		filepath := filepath.Join(outputDir, filename)
-
-		if err := createWCAGCompliantPDF(employee, filepath); err != nil {
-			fmt.Printf("Error generating PDF for %s: %v\n", filename, err)
-			continue
-		}
-
-		// Get file size
-		if fileInfo, err := os.Stat(filepath); err == nil {
-			totalSize += fileInfo.Size()
-		}
-
 		count++
-		if count%100 == 0 {
-			fmt.Printf("Generated %d PDFs... (%.2f MB so far)\n", count, float64(totalSize)/1024/1024)
-		}
 	}
+	close(jobs)
+
+	wg.Wait()
 
 	fmt.Printf("\nSuccessfully generated %d PDFs in %s\n", count, outputDir)
-	fmt.Printf("Total size: %.2f MB (average: %.2f KB per PDF)\n",
-		float64(totalSize)/1024/1024,
-		float64(totalSize)/float64(count)/1024)
-
 	return nil
 }
 
-func createWCAGCompliantPDF(emp EmployeeData, outputPath string) error {
+func createWCAGCompliantPDF(emp models.EmployeeData, outputPath string) error {
 	// Create new PDF with A4 page size
-	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf := fpdf.New("P", "mm", "A4", "")
 
 	// Enable UTF-8 support for Danish characters (æ, ø, å)
 	tr := pdf.UnicodeTranslatorFromDescriptor("cp1252")
@@ -215,13 +204,4 @@ func createWCAGCompliantPDF(emp EmployeeData, outputPath string) error {
 	}
 
 	return nil
-}
-
-func main() {
-	// Generate a limited number of PDFs for testing (e.g., 10)
-	// Change limit to 2000 for full generation, or 0 for all rows
-	if err := generatePDFs("dsb-mock-data-excel.xlsx", "output_pdfs", 10); err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
 }
