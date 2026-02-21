@@ -3,6 +3,24 @@ version: "2"
 run:
   timeout: 5m
 
+linters:
+  default: standard
+  enable:
+    - gosec
+  settings:
+    gosec:
+      excludes:
+        - G104  # Covered by errcheck
+        - G101  # False positives on constants
+        - G301  # Directory creation with intended permissions
+        - G304  # File paths from config/args, not user input
+        - G404  # Deprecated net/http/cgi import from Excel library dependency
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+
 formatters:
   enable:
     - gofmt
