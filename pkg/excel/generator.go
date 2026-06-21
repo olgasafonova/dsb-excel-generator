@@ -65,6 +65,42 @@ var securityLevels = []string{
 	"Internal", "Confidential", "Strictly Confidential",
 }
 
+// employeeRow holds all generated values for a single spreadsheet row, in
+// column order. Grouping them keeps the row-writing loop free of a long
+// positional argument list.
+type employeeRow struct {
+	cpr                  string
+	firstName            string
+	lastName             string
+	employeeNumber       string
+	department           string
+	baseSalary           float64
+	newBaseSalary        float64
+	grossSalary          float64
+	newGrossSalary       float64
+	individualAdjustment float64
+	percentageIncrease   float64
+	effectiveDate        string
+	pensionIncrease      float64
+	letterType           string
+	changeDescription    string
+	managerName          string
+	additionalNotes      string
+	documentType         string
+	caseNumber           string
+	securityLevel        string
+	letterContent        string
+}
+
+// excelHeaders lists the column headers in order, expanded for P360 integration.
+var excelHeaders = []string{
+	"CPR", "FirstName", "LastName", "EmployeeNumber", "Department",
+	"BaseSalary", "NewBaseSalary", "GrossSalary", "NewGrossSalary",
+	"IndividualAdjustment", "PercentageIncrease", "EffectiveDate", "PensionIncrease",
+	"LetterType", "ChangeDescription", "ManagerName", "AdditionalNotes",
+	"DocumentType", "CaseNumber", "SecurityLevel", "LetterContent",
+}
+
 // Generate creates the Excel file with mock data
 func Generate(filename string) error {
 	rand.Seed(time.Now().UnixNano())
@@ -74,185 +110,22 @@ func Generate(filename string) error {
 
 	sheetName := "Sheet1"
 
-	// Set column headers - expanded for P360 integration
-	headers := []string{
-		"CPR", "FirstName", "LastName", "EmployeeNumber", "Department",
-		"BaseSalary", "NewBaseSalary", "GrossSalary", "NewGrossSalary",
-		"IndividualAdjustment", "PercentageIncrease", "EffectiveDate", "PensionIncrease",
-		"LetterType", "ChangeDescription", "ManagerName", "AdditionalNotes",
-		"DocumentType", "CaseNumber", "SecurityLevel", "LetterContent",
-	}
-
-	// Write headers
-	for i, header := range headers {
-		col := getExcelColumn(i)
-		f.SetCellValue(sheetName, col+"1", header)
-	}
+	writeHeaders(f, sheetName)
 
 	// Track used CPR numbers to ensure uniqueness
 	usedCPRs := make(map[string]bool)
 
 	// Generate 3000 rows of data
 	for row := 2; row <= 3001; row++ {
-		// Generate unique CPR number (DDMMYY-XXXX)
-		var cpr string
-		for {
-			cpr = generateCPR()
-			if !usedCPRs[cpr] {
-				usedCPRs[cpr] = true
-				break
-			}
-		}
-
-		// Generate name
-		firstName := danishFirstNames[rand.Intn(len(danishFirstNames))]
-		lastName := danishLastNames[rand.Intn(len(danishLastNames))]
-
-		// Generate salaries (25,000 - 75,000 kr)
-		// Add more realistic variation with decimal places
-		baseSalary := float64(rand.Intn(50000)+25000) + rand.Float64()*1000
-
-		// Calculate individual adjustment (0.5% to 5% increase)
-		// Some employees get higher increases
-		percentageIncrease := 0.5 + rand.Float64()*4.5
-		// Round to 2 decimal places for realism
-		percentageIncrease = float64(int(percentageIncrease*100)) / 100
-
-		individualAdjustment := baseSalary * (percentageIncrease / 100)
-		newBaseSalary := baseSalary + individualAdjustment
-
-		// Gross salary includes some additional compensation (about 10-25% more)
-		// Variation depends on seniority/role
-		additionalComp := 1.1 + rand.Float64()*0.15
-		grossSalary := baseSalary * additionalComp
-		newGrossSalary := newBaseSalary * additionalComp
-
-		// Pension increase - mostly 1.00% but some variation for different agreements
-		pensionIncrease := 1.00
-		if rand.Float64() < 0.1 { // 10% get different pension rates
-			pensionIncrease = 0.5 + rand.Float64()*1.5 // 0.5% to 2%
-			pensionIncrease = float64(int(pensionIncrease*100)) / 100
-		}
-
-		// Effective date - most are 1. marts 2025, but some have different dates
-		effectiveDates := []string{
-			"1. marts 2025", "1. marts 2025", "1. marts 2025", "1. marts 2025",
-			"1. april 2025", "1. maj 2025", "1. februar 2025",
-		}
-		effectiveDate := effectiveDates[rand.Intn(len(effectiveDates))]
-
-		// Generate additional fields
-		employeeNumber := fmt.Sprintf("EMP%05d", row-1)
-		department := departments[rand.Intn(len(departments))]
-		letterType := letterTypes[rand.Intn(len(letterTypes))]
-		managerName := getRandomManagerName()
-		documentType := documentTypes[rand.Intn(len(documentTypes))]
-		caseNumber := fmt.Sprintf("2025-%05d", rand.Intn(99999)+1)
-		securityLevel := securityLevels[rand.Intn(len(securityLevels))]
-
-		// Generate change description based on letter type
-		var changeDescription string
-		switch letterType {
-		case "Salary Regulation 2025":
-			changeDescription = fmt.Sprintf("Individual salary increase of %.2f%% effective %s", percentageIncrease, effectiveDate)
-		case "Pension Change":
-			changeDescription = fmt.Sprintf("Pension contribution increase to %.2f%%", pensionIncrease)
-		case "Contract Amendment":
-			changeDescription = fmt.Sprintf("Contract update with new salary terms from %s", effectiveDate)
-		case "Annual Salary Review":
-			changeDescription = fmt.Sprintf("Annual review resulting in %.2f%% increase", percentageIncrease)
-		}
-
-		// Additional notes - 30% of employees get notes
-		additionalNotes := ""
-		if rand.Float64() < 0.3 {
-			notes := []string{
-				"Please confirm receipt by signing and returning this letter",
-				"Questions? Contact HR at hr@company.dk",
-				"This change was approved by your department manager",
-				"No action required from your side",
-				"Tax implications will be detailed in your next payslip",
-			}
-			additionalNotes = notes[rand.Intn(len(notes))]
-		}
-
-		// Generate full letter content
-		letterContent := generateLetterContent(
-			firstName, lastName,
-			fmt.Sprintf("%.2f", baseSalary),
-			fmt.Sprintf("%.2f", newBaseSalary),
-			fmt.Sprintf("%.2f", grossSalary),
-			fmt.Sprintf("%.2f", newGrossSalary),
-			fmt.Sprintf("%.2f", individualAdjustment),
-			fmt.Sprintf("%.2f", percentageIncrease),
-			effectiveDate,
-			fmt.Sprintf("%.2f", pensionIncrease),
-			letterType,
-		)
-
-		// Write data to cells using column helper
-		col := 0
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), cpr)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), firstName)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), lastName)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), employeeNumber)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), department)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", baseSalary))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", newBaseSalary))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", grossSalary))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", newGrossSalary))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", individualAdjustment))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", percentageIncrease))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), effectiveDate)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), fmt.Sprintf("%.2f", pensionIncrease))
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), letterType)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), changeDescription)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), managerName)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), additionalNotes)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), documentType)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), caseNumber)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), securityLevel)
-		col++
-		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), letterContent)
+		record := generateEmployeeRow(row, usedCPRs)
+		writeEmployeeRow(f, sheetName, row, record)
 
 		if row%100 == 0 {
 			fmt.Printf("Generated %d rows...\n", row-1)
 		}
 	}
 
-	// Set column widths for better readability
-	for i := 0; i < len(headers); i++ {
-		col := getExcelColumn(i)
-		width := 18.0
-
-		// Wider columns for text-heavy fields
-		if headers[i] == "LetterContent" {
-			width = 80.0
-		} else if headers[i] == "ChangeDescription" || headers[i] == "AdditionalNotes" {
-			width = 40.0
-		}
-
-		f.SetColWidth(sheetName, col, col, width)
-	}
+	setColumnWidths(f, sheetName)
 
 	// Save the file
 	if err := f.SaveAs(filename); err != nil {
@@ -261,6 +134,194 @@ func Generate(filename string) error {
 
 	fmt.Printf("\nSuccessfully generated %s with 3000 rows of data!\n", filename)
 	return nil
+}
+
+// writeHeaders writes the column header row.
+func writeHeaders(f *excelize.File, sheetName string) {
+	for i, header := range excelHeaders {
+		col := getExcelColumn(i)
+		f.SetCellValue(sheetName, col+"1", header)
+	}
+}
+
+// generateEmployeeRow produces one fully-populated row of mock data. The order
+// of rand calls is preserved from the original implementation so output is
+// reproducible for a given seed.
+func generateEmployeeRow(row int, usedCPRs map[string]bool) employeeRow {
+	// Generate unique CPR number (DDMMYY-XXXX)
+	var cpr string
+	for {
+		cpr = generateCPR()
+		if !usedCPRs[cpr] {
+			usedCPRs[cpr] = true
+			break
+		}
+	}
+
+	// Generate name
+	firstName := danishFirstNames[rand.Intn(len(danishFirstNames))]
+	lastName := danishLastNames[rand.Intn(len(danishLastNames))]
+
+	// Generate salaries (25,000 - 75,000 kr)
+	// Add more realistic variation with decimal places
+	baseSalary := float64(rand.Intn(50000)+25000) + rand.Float64()*1000
+
+	// Calculate individual adjustment (0.5% to 5% increase)
+	// Some employees get higher increases
+	percentageIncrease := 0.5 + rand.Float64()*4.5
+	// Round to 2 decimal places for realism
+	percentageIncrease = float64(int(percentageIncrease*100)) / 100
+
+	individualAdjustment := baseSalary * (percentageIncrease / 100)
+	newBaseSalary := baseSalary + individualAdjustment
+
+	// Gross salary includes some additional compensation (about 10-25% more)
+	// Variation depends on seniority/role
+	additionalComp := 1.1 + rand.Float64()*0.15
+	grossSalary := baseSalary * additionalComp
+	newGrossSalary := newBaseSalary * additionalComp
+
+	// Pension increase - mostly 1.00% but some variation for different agreements
+	pensionIncrease := 1.00
+	if rand.Float64() < 0.1 { // 10% get different pension rates
+		pensionIncrease = 0.5 + rand.Float64()*1.5 // 0.5% to 2%
+		pensionIncrease = float64(int(pensionIncrease*100)) / 100
+	}
+
+	// Effective date - most are 1. marts 2025, but some have different dates
+	effectiveDates := []string{
+		"1. marts 2025", "1. marts 2025", "1. marts 2025", "1. marts 2025",
+		"1. april 2025", "1. maj 2025", "1. februar 2025",
+	}
+	effectiveDate := effectiveDates[rand.Intn(len(effectiveDates))]
+
+	// Generate additional fields
+	employeeNumber := fmt.Sprintf("EMP%05d", row-1)
+	department := departments[rand.Intn(len(departments))]
+	letterType := letterTypes[rand.Intn(len(letterTypes))]
+	managerName := getRandomManagerName()
+	documentType := documentTypes[rand.Intn(len(documentTypes))]
+	caseNumber := fmt.Sprintf("2025-%05d", rand.Intn(99999)+1)
+	securityLevel := securityLevels[rand.Intn(len(securityLevels))]
+
+	changeDescription := buildChangeDescription(letterType, percentageIncrease, pensionIncrease, effectiveDate)
+	additionalNotes := buildAdditionalNotes()
+
+	// Generate full letter content
+	letterContent := generateLetterContent(letterParams{
+		firstName:            firstName,
+		lastName:             lastName,
+		baseSalary:           fmt.Sprintf("%.2f", baseSalary),
+		newBaseSalary:        fmt.Sprintf("%.2f", newBaseSalary),
+		grossSalary:          fmt.Sprintf("%.2f", grossSalary),
+		newGrossSalary:       fmt.Sprintf("%.2f", newGrossSalary),
+		individualAdjustment: fmt.Sprintf("%.2f", individualAdjustment),
+		percentageIncrease:   fmt.Sprintf("%.2f", percentageIncrease),
+		effectiveDate:        effectiveDate,
+		pensionIncrease:      fmt.Sprintf("%.2f", pensionIncrease),
+		letterType:           letterType,
+	})
+
+	return employeeRow{
+		cpr:                  cpr,
+		firstName:            firstName,
+		lastName:             lastName,
+		employeeNumber:       employeeNumber,
+		department:           department,
+		baseSalary:           baseSalary,
+		newBaseSalary:        newBaseSalary,
+		grossSalary:          grossSalary,
+		newGrossSalary:       newGrossSalary,
+		individualAdjustment: individualAdjustment,
+		percentageIncrease:   percentageIncrease,
+		effectiveDate:        effectiveDate,
+		pensionIncrease:      pensionIncrease,
+		letterType:           letterType,
+		changeDescription:    changeDescription,
+		managerName:          managerName,
+		additionalNotes:      additionalNotes,
+		documentType:         documentType,
+		caseNumber:           caseNumber,
+		securityLevel:        securityLevel,
+		letterContent:        letterContent,
+	}
+}
+
+// buildChangeDescription returns the change-description text for a letter type.
+func buildChangeDescription(letterType string, percentageIncrease, pensionIncrease float64, effectiveDate string) string {
+	switch letterType {
+	case "Salary Regulation 2025":
+		return fmt.Sprintf("Individual salary increase of %.2f%% effective %s", percentageIncrease, effectiveDate)
+	case "Pension Change":
+		return fmt.Sprintf("Pension contribution increase to %.2f%%", pensionIncrease)
+	case "Contract Amendment":
+		return fmt.Sprintf("Contract update with new salary terms from %s", effectiveDate)
+	case "Annual Salary Review":
+		return fmt.Sprintf("Annual review resulting in %.2f%% increase", percentageIncrease)
+	}
+	return ""
+}
+
+// buildAdditionalNotes returns optional notes; about 30% of employees get them.
+func buildAdditionalNotes() string {
+	if rand.Float64() >= 0.3 {
+		return ""
+	}
+	notes := []string{
+		"Please confirm receipt by signing and returning this letter",
+		"Questions? Contact HR at hr@company.dk",
+		"This change was approved by your department manager",
+		"No action required from your side",
+		"Tax implications will be detailed in your next payslip",
+	}
+	return notes[rand.Intn(len(notes))]
+}
+
+// writeEmployeeRow writes one record to the given spreadsheet row.
+func writeEmployeeRow(f *excelize.File, sheetName string, row int, r employeeRow) {
+	values := []interface{}{
+		r.cpr,
+		r.firstName,
+		r.lastName,
+		r.employeeNumber,
+		r.department,
+		fmt.Sprintf("%.2f", r.baseSalary),
+		fmt.Sprintf("%.2f", r.newBaseSalary),
+		fmt.Sprintf("%.2f", r.grossSalary),
+		fmt.Sprintf("%.2f", r.newGrossSalary),
+		fmt.Sprintf("%.2f", r.individualAdjustment),
+		fmt.Sprintf("%.2f", r.percentageIncrease),
+		r.effectiveDate,
+		fmt.Sprintf("%.2f", r.pensionIncrease),
+		r.letterType,
+		r.changeDescription,
+		r.managerName,
+		r.additionalNotes,
+		r.documentType,
+		r.caseNumber,
+		r.securityLevel,
+		r.letterContent,
+	}
+	for col, value := range values {
+		f.SetCellValue(sheetName, getExcelColumn(col)+fmt.Sprintf("%d", row), value)
+	}
+}
+
+// setColumnWidths sets readable widths, wider for text-heavy fields.
+func setColumnWidths(f *excelize.File, sheetName string) {
+	for i := 0; i < len(excelHeaders); i++ {
+		col := getExcelColumn(i)
+		width := 18.0
+
+		// Wider columns for text-heavy fields
+		if excelHeaders[i] == "LetterContent" {
+			width = 80.0
+		} else if excelHeaders[i] == "ChangeDescription" || excelHeaders[i] == "AdditionalNotes" {
+			width = 40.0
+		}
+
+		f.SetColWidth(sheetName, col, col, width)
+	}
 }
 
 // getExcelColumn converts column index to Excel column letter(s)
@@ -286,13 +347,26 @@ func generateCPR() string {
 	return fmt.Sprintf("%02d%02d%02d-%04d", day, month, year, sequence)
 }
 
+// letterParams carries the pre-formatted values needed to render a letter.
+type letterParams struct {
+	firstName            string
+	lastName             string
+	baseSalary           string
+	newBaseSalary        string
+	grossSalary          string
+	newGrossSalary       string
+	individualAdjustment string
+	percentageIncrease   string
+	effectiveDate        string
+	pensionIncrease      string
+	letterType           string
+}
+
 // generateLetterContent creates the full personalized letter text
-func generateLetterContent(firstName, lastName, baseSalary, newBaseSalary, grossSalary, newGrossSalary,
-	individualAdjustment, percentageIncrease, effectiveDate, pensionIncrease, letterType string) string {
+func generateLetterContent(p letterParams) string {
+	fullName := p.firstName + " " + p.lastName
 
-	fullName := firstName + " " + lastName
-
-	switch letterType {
+	switch p.letterType {
 	case "Salary Regulation 2025":
 		return fmt.Sprintf(`Lønregulering 2025
 
@@ -312,7 +386,7 @@ Din nye løn er med tilbagevirkende kraft fra den %s.
 Denne individuelle regulering vil finde sted ved lønudbetalingen ultimo juni måned 2025.
 
 Med venlig hilsen
-HR Services & Compensation`, fullName, pensionIncrease, effectiveDate, newBaseSalary, newGrossSalary, individualAdjustment, percentageIncrease, effectiveDate)
+HR Services & Compensation`, fullName, p.pensionIncrease, p.effectiveDate, p.newBaseSalary, p.newGrossSalary, p.individualAdjustment, p.percentageIncrease, p.effectiveDate)
 
 	case "Pension Change":
 		return fmt.Sprintf(`Ændring af pensionsbidrag
@@ -328,7 +402,7 @@ Din nuværende bruttoløn på %s kr. forbliver uændret. Ændringen påvirker ku
 Ændringen er en del af den nye overenskomst og vil fremgå af din næste lønseddel.
 
 Med venlig hilsen
-HR Services & Compensation`, fullName, effectiveDate, pensionIncrease, grossSalary)
+HR Services & Compensation`, fullName, p.effectiveDate, p.pensionIncrease, p.grossSalary)
 
 	case "Contract Amendment":
 		return fmt.Sprintf(`Tillæg til ansættelseskontrakt
@@ -344,7 +418,7 @@ Dine lønvilkår opdateres som følger:
 Alle andre vilkår i din ansættelseskontrakt forbliver uændrede.
 
 Med venlig hilsen
-HR Services & Compensation`, fullName, effectiveDate, newBaseSalary, newGrossSalary)
+HR Services & Compensation`, fullName, p.effectiveDate, p.newBaseSalary, p.newGrossSalary)
 
 	case "Annual Salary Review":
 		return fmt.Sprintf(`Årlig lønregulering
@@ -360,7 +434,7 @@ Din nye bruttoløn vil udgøre %s kr.
 Denne stigning er baseret på din præstation og udvikling i det forløbne år.
 
 Med venlig hilsen
-HR Services & Compensation`, fullName, effectiveDate, baseSalary, newBaseSalary, percentageIncrease, newGrossSalary)
+HR Services & Compensation`, fullName, p.effectiveDate, p.baseSalary, p.newBaseSalary, p.percentageIncrease, p.newGrossSalary)
 
 	default:
 		return "Letter content not available"
